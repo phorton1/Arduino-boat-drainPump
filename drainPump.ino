@@ -15,7 +15,7 @@
 // static state machine variables
 //---------------------------------
 
-#define MAX_SAMPLES		20
+#define MAX_SAMPLES		60
 	// this MUST jive with the allowed maximum in the UI!!
 
 enum PumpState { PUMP_OFF, PUMP_ON, PUMP_COOLDOWN };
@@ -134,10 +134,10 @@ const valDescriptor drain_pump_values[] =
  	{ID_SENSOR_LOW,    	VALUE_TYPE_BOOL,  	VALUE_STORE_PUB, 	VALUE_STYLE_READONLY,	(void *) &drainPump::_sensor_low,    	},
 
  	{ID_UI_INTERVAL,  	VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_ui_interval,		NULL,	{ .int_range = {1000,1000,30000}}, 	},
- 	{ID_CHK_INTERVAL,  	VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_chk_interval,		NULL,	{ .int_range = {1000,200, 30000}}, 	},
- 	{ID_NUM_SAMPLES,  	VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_num_samples,		NULL,	{ .int_range = {5,	 1,   20}}, 	},
- 	{ID_HIGH_TIME,		VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_high_time,		NULL,	{ .int_range = {12,  3,   120}}, 	},
- 	{ID_MAX_TIME,		VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_max_time,			NULL,	{ .int_range = {30,  10,  150}}, 	},
+ 	{ID_CHK_INTERVAL,  	VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_chk_interval,		NULL,	{ .int_range = {200, 100, 30000}}, 	},
+ 	{ID_NUM_SAMPLES,  	VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_num_samples,		NULL,	{ .int_range = {20,	 1,   MAX_SAMPLES}}, 	},
+ 	{ID_HIGH_TIME,		VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_high_time,		NULL,	{ .int_range = {30,  10,  180}}, 	},
+ 	{ID_MAX_TIME,		VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_max_time,			NULL,	{ .int_range = {90,  30,  300}}, 	},
  	{ID_COOLDOWN_TIME,  VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_cooldown_time,    NULL,	{ .int_range = {30,  10,  900}}, 	},
 
 	{ID_LED_BRIGHTNESS, VALUE_TYPE_INT, 	VALUE_STORE_PREF,	VALUE_STYLE_NONE,		(void *) &drainPump::_led_brightness,	(void *) drainPump::onBrightnessChanged, { .int_range = { DEFAULT_LED_BRIGHTNESS,  10,  255}} },
@@ -236,12 +236,14 @@ void loop()
 
 
 void drainPump::onDrainModeChanged(const myIOTValue *value, uint32_t val)
-	// called AFTER the member variable has changed
-	// asynchrounous to loop()
+	// called BEFORE the member variable has changed
+	// asynchrounous to loop(); since this takes some time,
+	// we explicitly set _drain_mode as soon as practicalble
 {
 	LOGU("onDrainModeChanged(%d)",val);
 	if (pump_on)
 		drain_pump->endRun(time(NULL));
+	drain_pump->_drain_mode = val;
 
 	// re-initialize state machine on any mode changes
 

@@ -9,8 +9,12 @@
 #include <myIOTWebServer.h>
 
 
-#define MAX_RUNS		500	// 4K bytes of history; keeps the last 499 runs which should be plenty
+#define MAX_RUNS				500	// 4K bytes of history; keeps the last 499 runs which should be plenty
 	// Note that the head slot is never used
+#define HIST_FLAG_FORCE			0x8000
+	// stuffed into the history error if the run was a force
+	// so that we can display it later
+
 
 typedef struct {
 	time_t 		start;		// starting time
@@ -61,7 +65,10 @@ void drainPump::endRun(time_t time_now)
 	history_t *hist = &history[head];
 	hist->start = m_run_start;
 	hist->dur   = (uint16_t) elapsed;
-	hist->err   = (uint16_t) m_error_code;
+
+	// use the special flag if it was FORCE
+	hist->err   = _drain_mode == DRAIN_MODE_FORCE ?
+		HIST_FLAG_FORCE : (uint16_t) m_error_code;
 		
 	m_run_start = 0;
 }
@@ -115,7 +122,8 @@ static bool sendRecordHTML(int num,time_t time_now,const history_t *rec, const h
 		text += "&nbsp;";
 	}
 	text += "</td><td align='center'>";
-	text += errorCodes[rec->err];
+	text += rec->err == HIST_FLAG_FORCE ? "FORCE" : errorCodes[rec->err];
+		// write "FORCE" if special flag, otherwise use the error code mapping
 	text += "</td></tr>";
 	if (!myiot_web_server->writeBinaryData(text.c_str(),text.length()))
 		return false;

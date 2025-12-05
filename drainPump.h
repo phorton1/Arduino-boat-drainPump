@@ -63,20 +63,20 @@
 #define ID_UI_INTERVAL			"UI_INTERVAL"	// int milliseconds; default=1000; min=1000; max=30000 (5 minutes)
 	// How often do we update the webUI.
 	
-#define ID_CHK_INTERVAL			"CHK_INTERVAL"	// int milliseconds; Default=200; min=200; max=30000 (30 seconds)
+#define ID_CHK_INTERVAL			"CHK_INTERVAL"	// int milliseconds; Default=200; min=100; max=30000 (30 seconds)
 	// In HIGH/BOTH modes, how often do we add to the circular buffer.
 	// This is coupled with NUM_SAMPLES to determine the actual update frequency for turning the pump ON/OFF.
 	// The HIGH_TIME and MAX_TIME settings are checked on every loop and not affected by this.
 	// The timer is reset when the DRAIN_MODE is changed.
 
-#define ID_NUM_SAMPLES			"NUM_SAMPLES"	// int; default=5, min=1, max=20;
+#define ID_NUM_SAMPLES			"NUM_SAMPLES"	// int; default=20, min=1, max=60;
 	// The number of samples in the circular buffer.
 	// This is coupled with CHK_INTERVAL to determin the actual update frequency for turning the pump ON/OFf.
 
-#define ID_HIGH_TIME			"HIGH_TIME"		// int seconds; Default=12; min=3; Max=120 (2 minutes)
+#define ID_HIGH_TIME			"HIGH_TIME"		// int seconds; Default=30; min=10; Max=180 (23 minutes)
 	// In HIGH mode this determines how long the pump will run.
 
-#define ID_MAX_TIME				"MAX_TIME"		// int seconds; Default=30; min=10; Max=150	(2.5 minutes)
+#define ID_MAX_TIME				"MAX_TIME"		// int seconds; Default=90; min=30; Max=300	(5 minutes)
 	// In BOTH mode the pump will be turned off after this many seconds in case the LOW (SENSOR_LOW) never indicates dry.
 	// If this occurs the UI will recieve ERROR=1 and will require the user to use the CLEAR_ERROR button,
 	//		or change DRAIN_MODES to remove it from the UI.

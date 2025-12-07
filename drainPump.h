@@ -11,21 +11,11 @@
 // pins
 //=========================================================
 
-#define BREADBOARD  	0
-
-#if BREADBOARD
-	#define PIN_PUMP		27
-	#define PIN_SENSOR_LOW	35
-	#define PIN_SENSOR_HIGH	34
-	#define PIN_SDRIVE		25
-	#define PIN_LED			15
-#else
-	#define PIN_PUMP		19
-	#define PIN_SENSOR_LOW	35
-	#define PIN_SENSOR_HIGH	33
-	#define PIN_SDRIVE		17
-	#define PIN_LED			16
-#endif
+#define PIN_PUMP		19		// inverted logic 0=on, 1=off
+#define PIN_SENSOR_LOW	33
+#define PIN_SENSOR_HIGH	35
+#define PIN_SDRIVE		17
+#define PIN_LED			16
 
 //------------------------
 // myIOT definition
@@ -51,12 +41,13 @@
 #define ERROR_HIGH_CYCLING		2	// HIGH sensor was still wet when HIGH_TIME ended
 #define ERROR_ILLEGAL			3	// used to force redisplay
 
+// CONFIGURATION
 
 #define ID_DRAIN_MODE			"DRAIN_MODE"
 	// enum: OFF, FORCE, HIGH, or BOTH
-	// OFF will turn the pump off, but will continue logging at LOG_INTERVAL
-	// FORCE will force the pump ON will continue logging at LOG_INTERVAL
-	// HIGH/BOTH modes use CHK_INTERVAL to check/debounce the sensors and possibly turn the pump ON/OFF
+	// OFF will turns the pump off
+	// FORCE will force the pump ON
+	// HIGH/BOTH modes use CHK_INTERVAL to check the sensors and possibly turn the pump ON/OFF
 	// HIGH turns the pump on when SENSOR_HIGH is wet and runs it for HIGH_TIME seconds
 	// BOTH turns the pump on when SENSOR_HIGH is wet and turns it off when SENSOR_LOW is dry
 
@@ -64,46 +55,47 @@
 	// How often do we update the webUI.
 	
 #define ID_CHK_INTERVAL			"CHK_INTERVAL"	// int milliseconds; Default=200; min=100; max=30000 (30 seconds)
-	// In HIGH/BOTH modes, how often do we add to the circular buffer.
-	// This is coupled with NUM_SAMPLES to determine the actual update frequency for turning the pump ON/OFF.
-	// The HIGH_TIME and MAX_TIME settings are checked on every loop and not affected by this.
-	// The timer is reset when the DRAIN_MODE is changed.
+	// How often do we sample the sensors into the circular buffers, and, if HIGH or BOTH
+	// how often we check to turn the pump on or off based on the CONFIGURATION values.
 
 #define ID_NUM_SAMPLES			"NUM_SAMPLES"	// int; default=20, min=1, max=60;
 	// The number of samples in the circular buffer.
 	// This is coupled with CHK_INTERVAL to determin the actual update frequency for turning the pump ON/OFf.
 
+#define ID_HIGH_THRESH			"HIGH_THRESH"	// int; default=100;  min=0; max=4094;
+#define ID_LOW_THRESH			"LOW_THRESH"	// int; default=100;  min=0; max=4094;
+	// In HIGH/BOTH modes, the pump is turned on if SENSOR_HIGH (average) is > HIGH_THRESH
+	// In BOTH mode the pump is turned off if was turned on at high and the SENSOR_LOW (average is <= LOW_THRESH.
+
 #define ID_HIGH_TIME			"HIGH_TIME"		// int seconds; Default=30; min=10; Max=180 (23 minutes)
 	// In HIGH mode this determines how long the pump will run.
+	// If the high sensor is still "wet" after this period, thw UI will recieve ERROR_HIGH_CYCLING
 
 #define ID_MAX_TIME				"MAX_TIME"		// int seconds; Default=90; min=30; Max=300	(5 minutes)
 	// In BOTH mode the pump will be turned off after this many seconds in case the LOW (SENSOR_LOW) never indicates dry.
-	// If this occurs the UI will recieve ERROR=1 and will require the user to use the CLEAR_ERROR button,
-	//		or change DRAIN_MODES to remove it from the UI.
-	//		However, the error itself will only be logged one time.
+	// If this occurs the UI will recieve ERROR_TOO_LONG_BOTH
 
 #define ID_COOLDOWN_TIME		"COOLDOWN_TIME"		// int seconds; Default=30 seconds; Min=10; Max=900 (15 minutes)
 	// After a HIGH/BOTH pump run, we will wait this many seconds before begining
 	// another HIGH/BOTH pump run.  The counter is cleared when the DRAIN_MODE is changed
 
 
-// UI readonly state output variables; these, along with the mode are compressed
-// into a single byte for logging along with the date_time for the event
-
-#define ID_SENSOR_LOW			"SENSOR_LOW"	// readonly, 0/1
-#define ID_SENSOR_HIGH			"SENSOR_HIGH"	// readonly, 0/1
-#define ID_PUMP_ON				"PUMP_ON"		// readonly; 0/1
-#define ID_ERROR_CODE			"ERROR_CODE"	// enum; currently "", "TOO_LONG"	cleared with clearError() UI command
+// USER INTERFACE
 
 #define ID_CLEAR_ERROR			"CLEAR_ERROR"		// a UI command to clear the error state, if any
 #define ID_LED_BRIGHTNESS		"LED_BRIGHTNESS"	// int; Default=32; min=10; max=255
+#define ID_HISTORY_LINK     	"HISTORY_LINK"
 
-// logging
 
-#define ID_TIME_LAST_RUN    "TIME_LAST_RUN"
-#define ID_DUR_LAST_RUN     "DUR_LAST_RUN"
-#define ID_SINCE_LAST_RUN   "SINCE_LAST_RUN"
-#define ID_HISTORY_LINK     "HISTORY_LINK"
+// STATE
+
+#define ID_STATE_STRING			"STATE_STRING"		// readonly string formatted according to the state upon changes
+#define ID_ERROR_CODE			"ERROR_CODE"		// enum; default "", "TOO_LONG"	cleared with clearError() UI command
+
+#define ID_TIME_LAST_RUN    	"TIME_LAST_RUN"		// statistics regarding the last completed run
+#define ID_DUR_LAST_RUN     	"DUR_LAST_RUN"
+#define ID_SINCE_LAST_RUN   	"SINCE_LAST_RUN"
+
 
 
 
@@ -118,39 +110,48 @@ public:
 	static int		_ui_interval;		// milliseconds
 	static int		_chk_interval;		// milliseconds
 	static int		_num_samples;		// int
+	static int 		_high_thresh;		// vs average of analog reads
+	static int 		_low_thresh;		// vs average of analog reads
 	static int		_high_time;			// seconds
 	static int		_max_time;			// seconds
 	static int		_cooldown_time;		// seconds
 
-	static bool		_sensor_low;		// 0/1
-	static bool		_sensor_high;		// 0/1
-	static bool		_pump_on;			// 0/1
-	static uint32_t	_error_code;		// enum
-
+	static String 	_state_string;		// built string
+ 	static uint32_t	_error_code;		// enum
 	static int		_led_brightness;	// 1..254
+	static String 	_history_link;		// built string
 
     static time_t   _time_last_run;
-    static int      _since_last_run;   // time_last_run as an int
+    static int      _since_last_run;
     static int      _dur_last_run;
-    static String 	_history_link;
 
 	static void onDrainModeChanged(const myIOTValue *value, uint32_t val);
 	static void onBrightnessChanged(const myIOTValue *desc, uint32_t val);
 	static void clearError();
+    virtual String onCustomLink(const String &path,  const char **mime_type) override;
 
 	void updateUI();
 	void handlePump();
 	void handlePixels();
 	void endRun(time_t time_now);
-	bool readSensor(int pin);
-
+	int readSensor(int pin, int *avg);
+	static void pumpOn(bool on);
+	
 	// public state variables to drainHistory.pm
 
 	static time_t m_run_start;
 	static uint32_t m_error_code;
-    virtual String onCustomLink(const String &path,  const char **mime_type) override;
+
+	// plotting
+
+
+	virtual bool hasPlot() override    { return true; }
 
 };
+
+
+
+
 
 
 extern enumValue errorCodes[];

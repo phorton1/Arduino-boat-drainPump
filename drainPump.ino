@@ -11,6 +11,7 @@
 #include <Adafruit_NeoPixel.h>
 
 
+
 //---------------------------------
 // static state machine variables
 //---------------------------------
@@ -18,25 +19,41 @@
 #define MAX_SAMPLES		60
 	// this MUST jive with the allowed maximum in the UI!!
 
-enum PumpState { PUMP_OFF, PUMP_ON, PUMP_COOLDOWN };
+enum PumpState { PUMP_OFF, PUMP_ON, PUMP_COOLDOWN, PUMP_ILLEGAL };
+static const char *pump_state_names[] = { "PUMP_OFF", "PUMP_ON", "COOLDOWN" };
 
 static PumpState pump_state = PUMP_OFF;
 
-static uint32_t last_chk = 0;
 static uint32_t last_ui = 0;
+static uint32_t last_chk = 0;
 static uint32_t pump_start = 0;
 static uint32_t cooldown_end = 0;
 
-static bool 	sensor_low = 0;
-static bool 	sensor_high = 0;
-static bool 	pump_on = 0;
+static int 		pump_on = 0;
+static int		high_wet = 0;
+static int		low_wet = 0;
+static int 		sensor_low = 0;
+static int 		sensor_high = 0;
 
 static int circ_buf1[MAX_SAMPLES] = {0};
 static int circ_buf2[MAX_SAMPLES] = {0};
 static int circ_ptr1 = 0;
 static int circ_ptr2 = 0;
 
+static PumpState last_pump_state = PUMP_ILLEGAL;
+static int 		last_pump_on = -1;
+static int		last_high_wet = -1;
+static int		last_low_wet = -1;
+static int 		last_sensor_low = -1;
+static int 		last_sensor_high = -1;
 
+
+//----------------------------------
+// plotting
+//----------------------------------
+
+static const char *plot_legend = "high,low,hwet,lwet,pump,cool,max";
+			
 //--------------------------------
 // pixels
 //--------------------------------
@@ -92,50 +109,44 @@ enumValue errorCodes[] = {
 
 static valueIdType dash_items[] = {
 	ID_DRAIN_MODE,
+	ID_STATE_STRING,
 	ID_ERROR_CODE,
 	ID_CLEAR_ERROR,
-
-	ID_PUMP_ON,
-	ID_SENSOR_HIGH,
-	ID_SENSOR_LOW,
-
-	ID_HISTORY_LINK,
-
     ID_TIME_LAST_RUN,
 	ID_SINCE_LAST_RUN,
     ID_DUR_LAST_RUN,
-
 	ID_LED_BRIGHTNESS,
+	ID_HISTORY_LINK,
     0
 };
-
 
 static valueIdType config_items[] = {
 	ID_UI_INTERVAL,
     ID_CHK_INTERVAL,
 	ID_NUM_SAMPLES,
+	ID_HIGH_THRESH,
+	ID_LOW_THRESH,
 	ID_HIGH_TIME,
 	ID_MAX_TIME,
 	ID_COOLDOWN_TIME,
-
 	0
 };
+
 
 const valDescriptor drain_pump_values[] =
 {
     {ID_DEVICE_NAME,	VALUE_TYPE_STRING,	VALUE_STORE_PREF,	VALUE_STYLE_REQUIRED,	NULL,	NULL,	DRAIN_PUMP },
         // override base class element
 	{ID_DRAIN_MODE,		VALUE_TYPE_ENUM,	VALUE_STORE_PREF,	VALUE_STYLE_NONE,		(void *) &drainPump::_drain_mode,		(void *) drainPump::onDrainModeChanged, 	{ .enum_range = { 0, drainModes }} },
- 	{ID_ERROR_CODE,     VALUE_TYPE_ENUM,  	VALUE_STORE_PUB, 	VALUE_STYLE_READONLY,	(void *) &drainPump::_error_code,    	NULL,										{ .enum_range = { 0, errorCodes }} },
+ 	{ID_STATE_STRING,   VALUE_TYPE_STRING,  VALUE_STORE_PUB, 	VALUE_STYLE_READONLY,	(void *) &drainPump::_state_string,    	},
+  	{ID_ERROR_CODE,     VALUE_TYPE_ENUM,  	VALUE_STORE_PUB, 	VALUE_STYLE_READONLY,	(void *) &drainPump::_error_code,    	NULL,										{ .enum_range = { 0, errorCodes }} },
 	{ID_CLEAR_ERROR,    VALUE_TYPE_COMMAND, VALUE_STORE_SUB,    VALUE_STYLE_NONE,       NULL,                     				(void *) drainPump::clearError },
-
- 	{ID_PUMP_ON,     	VALUE_TYPE_BOOL,  	VALUE_STORE_PUB, 	VALUE_STYLE_READONLY,	(void *) &drainPump::_pump_on,    		},
- 	{ID_SENSOR_HIGH,    VALUE_TYPE_BOOL,  	VALUE_STORE_PUB, 	VALUE_STYLE_READONLY,	(void *) &drainPump::_sensor_high,    	},
- 	{ID_SENSOR_LOW,    	VALUE_TYPE_BOOL,  	VALUE_STORE_PUB, 	VALUE_STYLE_READONLY,	(void *) &drainPump::_sensor_low,    	},
 
  	{ID_UI_INTERVAL,  	VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_ui_interval,		NULL,	{ .int_range = {1000,1000,30000}}, 	},
  	{ID_CHK_INTERVAL,  	VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_chk_interval,		NULL,	{ .int_range = {200, 100, 30000}}, 	},
  	{ID_NUM_SAMPLES,  	VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_num_samples,		NULL,	{ .int_range = {20,	 1,   MAX_SAMPLES}}, 	},
+ 	{ID_HIGH_THRESH,  	VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_high_thresh,		NULL,	{ .int_range = {100, 0,   4094}}, 	},
+ 	{ID_LOW_THRESH,  	VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_low_thresh,		NULL,	{ .int_range = {100, 0,   4094}}, 	},
  	{ID_HIGH_TIME,		VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_high_time,		NULL,	{ .int_range = {30,  10,  180}}, 	},
  	{ID_MAX_TIME,		VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_max_time,			NULL,	{ .int_range = {90,  30,  300}}, 	},
  	{ID_COOLDOWN_TIME,  VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_cooldown_time,    NULL,	{ .int_range = {30,  10,  900}}, 	},
@@ -156,13 +167,13 @@ const valDescriptor drain_pump_values[] =
 drainPump *drain_pump;
 
 uint32_t	drainPump::_drain_mode;
-bool   		drainPump::_sensor_low = -1;
-bool   		drainPump::_sensor_high = -1;
-bool   		drainPump::_pump_on = -1;
+String		drainPump::_state_string;
 uint32_t   	drainPump::_error_code = ERROR_ILLEGAL;
 int   		drainPump::_ui_interval;
 int   		drainPump::_chk_interval;
 int   		drainPump::_num_samples;
+int   		drainPump::_high_thresh;
+int   		drainPump::_low_thresh;
 int   		drainPump::_high_time;
 int   		drainPump::_max_time;
 int   		drainPump::_cooldown_time;
@@ -182,18 +193,15 @@ uint32_t 	drainPump::m_error_code = ERROR_NONE;
 
 void setup()
 {
-	pinMode(PIN_PUMP,OUTPUT);
-	digitalWrite(PIN_PUMP,0);
+	drainPump::pumpOn(0);	
 
 	setPixelsBrightness(INITIAL_LED_BRIGHTNESS);
 	setPixel(PIXEL_SYSTEM,MY_LED_CYAN);
 	setPixel(PIXEL_STATE,MY_LED_CYAN);
 	showPixels();
 
-	ledcSetup(0, 2000, 1);   	// channel 0, 2 kHz, 1-bit resolution
-	ledcAttachPin(PIN_SDRIVE, 0);
-	ledcWrite(0, 1);          	// 50% duty (1 of 2 at 1-bit)
-
+	pinMode(PIN_SDRIVE,OUTPUT);
+	digitalWrite(PIN_SDRIVE,0);
 	pinMode(PIN_SENSOR_LOW,INPUT);
 	pinMode(PIN_SENSOR_HIGH,INPUT);
 
@@ -213,6 +221,8 @@ void setup()
     drain_pump->_history_link = "<a href='/custom/getHistory?uuid=";
     drain_pump->_history_link += drain_pump->getUUID();
     drain_pump->_history_link += "' target='_blank'>History</a>";
+
+	drain_pump->setPlotLegend(plot_legend);
 
 	setPixelsBrightness(drain_pump->_led_brightness);
 	setPixel(PIXEL_SYSTEM,MY_LED_BLACK);
@@ -234,6 +244,18 @@ void loop()
 // myIOT implementation
 //-------------------------------------------
 
+void drainPump::pumpOn(bool on)
+{
+	LOGI("pumpON(%d)",on);
+	pinMode(PIN_PUMP,OUTPUT);
+	digitalWrite(PIN_PUMP,on?0:1);
+	if (!on)
+		pinMode(PIN_PUMP,INPUT);
+			// go to floating state
+			// and let 3.3V pullup thru 10K keep it there
+	pump_on = on;
+}
+
 
 void drainPump::onDrainModeChanged(const myIOTValue *value, uint32_t val)
 	// called BEFORE the member variable has changed
@@ -247,26 +269,34 @@ void drainPump::onDrainModeChanged(const myIOTValue *value, uint32_t val)
 
 	// re-initialize state machine on any mode changes
 
-	drain_pump->_sensor_low = -1;
-	drain_pump->_sensor_high = -1;
-	drain_pump->_pump_on = -1;
-	drain_pump->_error_code = ERROR_ILLEGAL;
-	drain_pump->m_error_code = ERROR_NONE;
-
-	memset(circ_buf1,0,MAX_SAMPLES * sizeof(int));
-	memset(circ_buf2,0,MAX_SAMPLES * sizeof(int));
-	circ_ptr1 = 0;
-	circ_ptr2 = 0;
-
+	last_ui = 0;
 	last_chk = 0;
-	last_ui  = 0;
 	pump_start = 0;
 	cooldown_end = 0;
 
+	pump_on = 0;
+	high_wet = 0;
+	low_wet = 0;
 	sensor_low = 0;
 	sensor_high = 0;
-	pump_on = 0;
-	digitalWrite(PIN_PUMP,0);
+
+	// memset(circ_buf1,0,MAX_SAMPLES * sizeof(int));
+	// memset(circ_buf2,0,MAX_SAMPLES * sizeof(int));
+	// circ_ptr1 = 0;
+	// circ_ptr2 = 0;
+
+	last_pump_on = -1;
+	last_high_wet = -1;
+	last_low_wet = -1;
+	last_sensor_low = -1;
+	last_sensor_high = -1;
+
+	last_pump_state = PUMP_ILLEGAL;
+
+	drain_pump->_error_code = ERROR_ILLEGAL;
+	drain_pump->m_error_code = ERROR_NONE;
+
+	pumpOn(0);
 	drain_pump->updateUI();
 }
 
@@ -287,12 +317,31 @@ void drainPump::clearError()
 
 void drainPump::updateUI()
 {
-	if (sensor_low != _sensor_low)
-		setBool(ID_SENSOR_LOW,sensor_low);
-	if (sensor_high != _sensor_high)
-		setBool(ID_SENSOR_HIGH,sensor_high);
-	if (pump_on != _pump_on)
-		setBool(ID_PUMP_ON,pump_on);
+	if (last_pump_on		!= pump_on		||
+		last_high_wet	    != high_wet	    ||
+		last_low_wet	    != low_wet	    ||
+		last_sensor_low	    != sensor_low	||
+		last_sensor_high	!= sensor_high  ||
+		last_pump_state	    != pump_state	)
+	{
+		last_pump_on		= pump_on	     ;
+		last_high_wet	    = high_wet	     ;
+		last_low_wet	    = low_wet	     ;
+		last_sensor_low	    = sensor_low     ;
+		last_sensor_high	= sensor_high    ;
+		last_pump_state	    = pump_state     ;
+
+		static char buf[255];
+		sprintf(buf,"%s pump_on(%d) low(%d)=%s high(%d)=%s",
+			pump_state_names[(int)pump_state],
+			pump_on,
+			sensor_low,
+			(low_wet?"wet":"dry"),
+			sensor_high,
+			(high_wet?"wet":"dry"));
+
+		setString(ID_STATE_STRING,buf);
+	}
 	if (m_error_code != _error_code)
 		setEnum(ID_ERROR_CODE,m_error_code);
 }
@@ -361,6 +410,10 @@ void drainPump::handlePixels()
 // handlePump()
 //-----------------------------------------------------------------------
 
+
+#define SENSOR_THRESHOLD  2048
+
+
 void drainPump::handlePump()
 {
     uint32_t now = millis();
@@ -373,15 +426,51 @@ void drainPump::handlePump()
     if (now - last_chk >= _chk_interval)
     {
         last_chk = now;
-        sensor_low = readSensor(PIN_SENSOR_LOW);
-        sensor_high = readSensor(PIN_SENSOR_HIGH);
-		LOGV("drain_mode(%d) error(%d) pump_on(%d) pump_state(%d) sensor_low(%d) sensor_high(%d)",
+		int low = readSensor(PIN_SENSOR_LOW,&sensor_low);
+        int high = readSensor(PIN_SENSOR_HIGH,&sensor_high);
+
+		low_wet = sensor_low > _low_thresh ? 1:0;
+		high_wet = sensor_high > _high_thresh ? 1:0;
+
+		LOGV("mode(%d) err(%d) on(%d) state(%d) cur/avg/wet low(%4d,%4d,%d) high(%4d,%4d,%d)",
 			 _drain_mode,
 			 m_error_code,
 			 pump_on,
 			 pump_state,
+			 low,
 			 sensor_low,
-			 sensor_high);
+			 low_wet,
+			 high,
+			 sensor_high,
+			 high_wet);
+
+		// if myIOTDevice::_plot_data is ON,
+		// created and broadcast the json
+
+		if (_plot_data)
+		{
+			// static const char *plot_legend = "high,low,hwet,lwet,pump,cool,400,0";
+			static char plot_buf[255];
+			int is_cool = pump_state == PUMP_COOLDOWN ? 1 : 0;
+
+			// set a scaling maximum at least 50 above highest value
+			
+			int max = 400;
+			if (sensor_low+50 > max)
+				max = sensor_low + 50;
+			if (sensor_high+50 > max)
+				max = sensor_high + max;
+
+			sprintf(plot_buf,"{\"plot_data\":[%d,%d,%d,%d,%d,%d,%d]}",
+				sensor_high,
+				sensor_low,
+				high_wet*800,
+				low_wet*700,
+				pump_on*900,
+				is_cool*900,
+				1000);
+				wsBroadcast(plot_buf);
+		}
     }
 
     //--------------------------------------
@@ -394,20 +483,20 @@ void drainPump::handlePump()
         updateUI();
 	}
 
+
     //--------------------------------------
     // Mode overrides
     //--------------------------------------
 	// with short returns (so pixels must be above this)
 
-	drain_pump->handlePixels();
+	handlePixels();
     switch (_drain_mode)
     {
         case DRAIN_MODE_OFF:
             if (pump_on)
             {
 				LOGU("PUMP OFF due to DRAIN_MODE_OFF");
-                pump_on = false;
-                digitalWrite(PIN_PUMP, LOW);
+                pumpOn(0);
             }
             return;
 
@@ -415,9 +504,8 @@ void drainPump::handlePump()
             if (!pump_on)
             {
 				LOGU("PUMP ON due to DRAIN_MODE_FORCE");
-                pump_on = true;
-                digitalWrite(PIN_PUMP, HIGH);
-				drain_pump->m_run_start = time_now;
+                pumpOn(1);
+				m_run_start = time_now;
             }
             return;
     }
@@ -429,14 +517,13 @@ void drainPump::handlePump()
     switch (pump_state)
     {
         case PUMP_OFF:
-            if (sensor_high)   // high sensor wet
+            if (high_wet)   // high sensor wet
             {
 				LOGU("PUMP ON");
-                pump_on = true;
-                digitalWrite(PIN_PUMP, HIGH);
+                pumpOn(1);
                 pump_start = now;
                 pump_state = PUMP_ON;
-				drain_pump->m_run_start = time_now;
+				m_run_start = time_now;
             }
             break;
 
@@ -456,7 +543,7 @@ void drainPump::handlePump()
             }
             else if (_drain_mode == DRAIN_MODE_BOTH)
             {
-                if (!sensor_low)   // low sensor dry
+                if (!low_wet)   // low sensor dry
                 {
 					LOGU("PUMP OFF (due to SENSOR_LOW dry)");
                     pump_state = PUMP_COOLDOWN;
@@ -471,10 +558,9 @@ void drainPump::handlePump()
 			if (pump_state == PUMP_COOLDOWN)
 			{
 				LOGI("starting COOLDOWN %d seconds",_cooldown_time);
-				pump_on = false;
-				digitalWrite(PIN_PUMP, LOW);
+				pumpOn(0);
                 cooldown_end = now + (_cooldown_time * 1000);
-				drain_pump->endRun(time_now);
+				endRun(time_now);
 			}
             break;
 
@@ -493,31 +579,30 @@ void drainPump::handlePump()
 //-----------------------------------------------------------------------
 // readSensor()
 //-----------------------------------------------------------------------
-// simple rolling average debounce
-// This *should* be set to approximately 1 over CHK_INTERVAL, i.e.
-// if check interval is 200ms, then we would average 5 samples to
-// get a one second window.
 
-
-bool drainPump::readSensor(int pin)
+int drainPump::readSensor(int pin, int *avg)
 {
-    int val = digitalRead(pin);
+	int val = 0;
+	digitalWrite(PIN_SDRIVE, HIGH);         // drive rod to 3.3 V
+	delayMicroseconds(300);                 // excite for ~0.3 ms
 
-    if (pin == PIN_SENSOR_LOW)
-    {
-        circ_buf1[circ_ptr1++ % _num_samples] = val;
-        int sum = 0;
-        for (int i=0; i<_num_samples; i++) sum += circ_buf1[i];
-        return (sum > (_num_samples/2));
-    }
-    else
-    {
-        circ_buf2[circ_ptr2++ % _num_samples] = val;
-        int sum = 0;
-        for (int i=0; i<_num_samples; i++) sum += circ_buf2[i];
-        return (sum > (_num_samples/2));
-    }
+	volatile int tmp = analogRead(pin);     // discard first read
+	val = analogRead(pin);                  // keep second read
+	digitalWrite(PIN_SDRIVE, LOW);          // stop drive
+
+	int sum = 0;
+	if (pin == PIN_SENSOR_LOW)
+	{
+		circ_buf1[circ_ptr1++ % _num_samples] = val;
+		for (int i = 0; i < _num_samples; i++) sum += circ_buf1[i];
+	}
+	else
+	{
+		circ_buf2[circ_ptr2++ % _num_samples] = val;
+		for (int i = 0; i < _num_samples; i++) sum += circ_buf2[i];
+	}
+
+	*avg = sum / _num_samples;  // average (0..4095 for 12-bit ADC)
+	return val;
 }
-
-
 

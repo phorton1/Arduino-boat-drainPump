@@ -11,7 +11,6 @@
 #include <Adafruit_NeoPixel.h>
 
 
-
 //---------------------------------
 // static state machine variables
 //---------------------------------
@@ -202,6 +201,7 @@ void setup()
 
 	pinMode(PIN_SDRIVE,OUTPUT);
 	digitalWrite(PIN_SDRIVE,0);
+
 	pinMode(PIN_SENSOR_LOW,INPUT);
 	pinMode(PIN_SENSOR_HIGH,INPUT);
 
@@ -423,11 +423,15 @@ void drainPump::handlePump()
     // Sample sensors on interval
     //--------------------------------------
 
-    if (now - last_chk >= _chk_interval)
+	#define CHECK_WHILE_ON	 1000
+		// while the pump is on we check once per second, period
+
+    if ((pump_on && (now - last_chk >= CHECK_WHILE_ON)) ||
+		(!pump_on && (now - last_chk >= _chk_interval))  )
     {
         last_chk = now;
-		int low = readSensor(PIN_SENSOR_LOW,&sensor_low);
         int high = readSensor(PIN_SENSOR_HIGH,&sensor_high);
+		int low = readSensor(PIN_SENSOR_LOW,&sensor_low);
 
 		low_wet = sensor_low > _low_thresh ? 1:0;
 		high_wet = sensor_high > _high_thresh ? 1:0;
@@ -497,6 +501,7 @@ void drainPump::handlePump()
             {
 				LOGU("PUMP OFF due to DRAIN_MODE_OFF");
                 pumpOn(0);
+				updateUI();
             }
             return;
 
@@ -506,6 +511,7 @@ void drainPump::handlePump()
 				LOGU("PUMP ON due to DRAIN_MODE_FORCE");
                 pumpOn(1);
 				m_run_start = time_now;
+				updateUI();
             }
             return;
     }
@@ -524,6 +530,7 @@ void drainPump::handlePump()
                 pump_start = now;
                 pump_state = PUMP_ON;
 				m_run_start = time_now;
+				updateUI();
             }
             break;
 
@@ -561,6 +568,7 @@ void drainPump::handlePump()
 				pumpOn(0);
                 cooldown_end = now + (_cooldown_time * 1000);
 				endRun(time_now);
+				updateUI();
 			}
             break;
 
@@ -569,6 +577,7 @@ void drainPump::handlePump()
             {
 				LOGU("COOLDOWN time complete");
                 pump_state = PUMP_OFF;
+				updateUI();
             }
             break;
     }
@@ -579,15 +588,24 @@ void drainPump::handlePump()
 //-----------------------------------------------------------------------
 // readSensor()
 //-----------------------------------------------------------------------
+// There is an "issue" with the topology of the PCB.
+// Apparently the jumper from the high-input pin that crosses the drive signal
+// results in a lower reading (approx 50%) for the high sensor vs the low sensor.
+// I *could* have designed the connector differently and avoided that, but it's
+// done now.
 
 int drainPump::readSensor(int pin, int *avg)
 {
 	int val = 0;
 	digitalWrite(PIN_SDRIVE, HIGH);         // drive rod to 3.3 V
-	delayMicroseconds(300);                 // excite for ~0.3 ms
+	delayMicroseconds(1000);                 // excite for 1ms
+		// higher delays here lead directly to higher readings.
+		// 1000 ms leads to low reading approx 0..1000 and high
+		// approx 0..500.
 
 	volatile int tmp = analogRead(pin);     // discard first read
 	val = analogRead(pin);                  // keep second read
+
 	digitalWrite(PIN_SDRIVE, LOW);          // stop drive
 
 	int sum = 0;

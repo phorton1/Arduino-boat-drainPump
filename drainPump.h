@@ -10,11 +10,19 @@
 //=========================================================
 // pins
 //=========================================================
+// Note that the PCB was designed using LOW=gpio34 AND
+// HIGH=gpio33, but I thought there was a problem and hand
+// modified the PCB to use 34/35 as shown here.
+// Turns out the problem was (apparently) coupling from
+// the jumper that crosses HIGH over the DRIVE signal,
+// which could/should be "fixed" in future revisions of
+// the board by making the pins DRIVE,HIGH,LOW, instead of
+// HIGH/DRIVE/LOW.
 
-#define PIN_PUMP		19		// inverted logic 0=on, 1=off
-#define PIN_SENSOR_LOW	33
+#define PIN_PUMP		17		// inverted logic 0=on, 1=off
+#define PIN_SENSOR_LOW	34
 #define PIN_SENSOR_HIGH	35
-#define PIN_SDRIVE		17
+#define PIN_SDRIVE		26
 #define PIN_LED			16
 
 //------------------------

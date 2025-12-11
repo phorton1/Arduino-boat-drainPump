@@ -190,7 +190,7 @@ U 1 1 694827BA
 P 5550 2550
 F 0 "C2" H 5300 2450 50  0000 L CNN
 F 1 "2.2uf" H 5250 2550 50  0000 L CNN
-F 2 "0_my_footprints:myCapCeramicSmall" H 5588 2400 50  0001 C CNN
+F 2 "0_my_footprints:myCapTantulum2" H 5588 2400 50  0001 C CNN
 F 3 "~" H 5550 2550 50  0001 C CNN
 	1    5550 2550
 	-1   0    0    -1  
@@ -251,17 +251,6 @@ F 3 "~" H 1250 4650 50  0001 C CNN
 	1    1250 4650
 	-1   0    0    -1  
 $EndComp
-$Comp
-L Connector_Generic:Conn_01x02 J8
-U 1 1 6931ED47
-P 1250 5500
-F 0 "J8" H 1250 5150 50  0000 C CNN
-F 1 "PUMP" H 1250 5250 50  0000 C CNN
-F 2 "0_my_footprints:myPheonix2x3.81_right" H 1250 5500 50  0001 C CNN
-F 3 "~" H 1250 5500 50  0001 C CNN
-	1    1250 5500
-	-1   0    0    1   
-$EndComp
 Text GLabel 1450 5400 2    50   Input ~ 0
 PUMP+
 Text GLabel 1450 5500 2    50   Input ~ 0
@@ -312,7 +301,7 @@ F 3 "" H 3400 2700 50  0001 C CNN
 	1    3400 2700
 	-1   0    0    -1  
 $EndComp
-Text GLabel 2400 3850 3    50   Input ~ 0
+Text GLabel 2500 2850 1    50   Input ~ 0
 S_DRIVE
 Text GLabel 2900 2850 1    50   Input ~ 0
 SENSOR_LOW
@@ -431,21 +420,21 @@ SENSOR_HIGH
 Text GLabel 6100 3150 2    50   Input ~ 0
 ROD_HIGH
 $Comp
-L Device:C C?
+L Device:C C5
 U 1 1 6939CEB0
 P 5550 3300
-F 0 "C?" H 5300 3200 50  0000 L CNN
+F 0 "C5" H 5300 3200 50  0000 L CNN
 F 1 "2.2uf" H 5250 3300 50  0000 L CNN
-F 2 "0_my_footprints:myCapCeramicSmall" H 5588 3150 50  0001 C CNN
+F 2 "0_my_footprints:myCapTantulum2" H 5588 3150 50  0001 C CNN
 F 3 "~" H 5550 3300 50  0001 C CNN
 	1    5550 3300
 	-1   0    0    -1  
 $EndComp
 $Comp
-L Device:R R?
+L Device:R R3
 U 1 1 6939CEB6
 P 5250 3300
-F 0 "R?" H 5350 3300 50  0000 L CNN
+F 0 "R3" H 5350 3300 50  0000 L CNN
 F 1 "100K" V 5250 3300 50  0000 C CNN
 F 2 "0_my_footprints:myResistor" V 5180 3300 50  0001 C CNN
 F 3 "~" H 5250 3300 50  0001 C CNN
@@ -453,10 +442,10 @@ F 3 "~" H 5250 3300 50  0001 C CNN
 	-1   0    0    -1  
 $EndComp
 $Comp
-L Device:R R?
+L Device:R R2
 U 1 1 6939CEBC
 P 5800 3150
-F 0 "R?" V 5900 3100 50  0000 L CNN
+F 0 "R2" V 5900 3100 50  0000 L CNN
 F 1 "1K" V 5800 3150 50  0000 C CNN
 F 2 "0_my_footprints:myResistor" V 5730 3150 50  0001 C CNN
 F 3 "~" H 5800 3150 50  0001 C CNN
@@ -466,10 +455,10 @@ $EndComp
 Wire Wire Line
 	5950 3150 6100 3150
 $Comp
-L power:GND #PWR?
+L power:GND #PWR06
 U 1 1 6939CEC3
 P 5400 3450
-F 0 "#PWR?" H 5400 3200 50  0001 C CNN
+F 0 "#PWR06" H 5400 3200 50  0001 C CNN
 F 1 "GND" H 5405 3277 50  0000 C CNN
 F 2 "" H 5400 3450 50  0001 C CNN
 F 3 "" H 5400 3450 50  0001 C CNN
@@ -507,10 +496,10 @@ Wire Wire Line
 Wire Wire Line
 	4750 4600 4750 4250
 $Comp
-L Device:R R?
+L Device:R R7
 U 1 1 6952A593
 P 4750 4750
-F 0 "R?" V 4650 4700 50  0001 L CNN
+F 0 "R7" V 4650 4700 50  0000 L CNN
 F 1 "100K" V 4750 4750 50  0000 C CNN
 F 2 "0_my_footprints:myResistor" V 4680 4750 50  0001 C CNN
 F 3 "~" H 4750 4750 50  0001 C CNN
@@ -518,10 +507,10 @@ F 3 "~" H 4750 4750 50  0001 C CNN
 	-1   0    0    -1  
 $EndComp
 $Comp
-L Device:R R?
+L Device:R R10
 U 1 1 69528E35
 P 4750 5250
-F 0 "R?" V 4650 5200 50  0001 L CNN
+F 0 "R10" V 4650 5200 50  0000 L CNN
 F 1 "33K" V 4750 5250 50  0000 C CNN
 F 2 "0_my_footprints:myResistor" V 4680 5250 50  0001 C CNN
 F 3 "~" H 4750 5250 50  0001 C CNN
@@ -531,10 +520,10 @@ $EndComp
 Wire Wire Line
 	3900 5000 4000 5000
 $Comp
-L Device:R R?
+L Device:R R9
 U 1 1 694D6E85
 P 4150 5000
-F 0 "R?" V 4050 4950 50  0001 L CNN
+F 0 "R9" V 4050 4950 50  0000 L CNN
 F 1 "220" V 4150 5000 50  0000 C CNN
 F 2 "0_my_footprints:myResistor" V 4080 5000 50  0001 C CNN
 F 3 "~" H 4150 5000 50  0001 C CNN
@@ -553,10 +542,10 @@ Wire Wire Line
 Wire Wire Line
 	5300 4250 5050 4250
 $Comp
-L power:GND #PWR?
+L power:GND #PWR011
 U 1 1 69474A8E
 P 5050 4550
-F 0 "#PWR?" H 5050 4300 50  0001 C CNN
+F 0 "#PWR011" H 5050 4300 50  0001 C CNN
 F 1 "GND" V 5050 4350 50  0000 C CNN
 F 2 "" H 5050 4550 50  0001 C CNN
 F 3 "" H 5050 4550 50  0001 C CNN
@@ -564,21 +553,21 @@ F 3 "" H 5050 4550 50  0001 C CNN
 	-1   0    0    -1  
 $EndComp
 $Comp
-L Device:C C?
+L Device:C C6
 U 1 1 69474A88
 P 5050 4400
-F 0 "C?" H 5000 4800 50  0000 L CNN
+F 0 "C6" H 5000 4800 50  0000 L CNN
 F 1 "10uf" H 5000 4700 50  0000 L CNN
-F 2 "0_my_footprints:myCapCeramicSmall" H 5088 4250 50  0001 C CNN
+F 2 "0_my_footprints:CP_my10uf" H 5088 4250 50  0001 C CNN
 F 3 "~" H 5050 4400 50  0001 C CNN
 	1    5050 4400
 	1    0    0    -1  
 $EndComp
 $Comp
-L power:GND #PWR?
+L power:GND #PWR015
 U 1 1 69472D8A
 P 5300 4550
-F 0 "#PWR?" H 5300 4300 50  0001 C CNN
+F 0 "#PWR015" H 5300 4300 50  0001 C CNN
 F 1 "GND" V 5300 4350 50  0000 C CNN
 F 2 "" H 5300 4550 50  0001 C CNN
 F 3 "" H 5300 4550 50  0001 C CNN
@@ -586,10 +575,10 @@ F 3 "" H 5300 4550 50  0001 C CNN
 	-1   0    0    -1  
 $EndComp
 $Comp
-L Device:C C?
+L Device:C C7
 U 1 1 69472D84
 P 5300 4400
-F 0 "C?" H 5300 4800 50  0000 L CNN
+F 0 "C7" H 5300 4800 50  0000 L CNN
 F 1 "0.1uf" H 5250 4700 50  0000 L CNN
 F 2 "0_my_footprints:myCapCeramicSmall" H 5338 4250 50  0001 C CNN
 F 3 "~" H 5300 4400 50  0001 C CNN
@@ -625,10 +614,10 @@ Wire Wire Line
 	6450 5600 6850 5600
 Connection ~ 6450 5600
 $Comp
-L Device:R R?
+L Device:R R8
 U 1 1 69448AEE
 P 6250 4950
-F 0 "R?" V 6150 4900 50  0001 L CNN
+F 0 "R8" V 6150 4900 50  0000 L CNN
 F 1 "100" V 6250 4950 50  0000 C CNN
 F 2 "0_my_footprints:myResistor" V 6180 4950 50  0001 C CNN
 F 3 "~" H 6250 4950 50  0001 C CNN
@@ -649,10 +638,10 @@ Connection ~ 6850 4350
 Wire Wire Line
 	7050 4350 6850 4350
 $Comp
-L Device:R R?
+L Device:R R11
 U 1 1 69417B11
 P 6450 5250
-F 0 "R?" V 6350 5200 50  0001 L CNN
+F 0 "R11" V 6350 5200 50  0000 L CNN
 F 1 "10K" V 6450 5250 50  0000 C CNN
 F 2 "0_my_footprints:myResistor" V 6380 5250 50  0001 C CNN
 F 3 "~" H 6450 5250 50  0001 C CNN
@@ -660,10 +649,10 @@ F 3 "~" H 6450 5250 50  0001 C CNN
 	-1   0    0    -1  
 $EndComp
 $Comp
-L power:GND #PWR?
+L power:GND #PWR018
 U 1 1 693D2296
 P 5950 5700
-F 0 "#PWR?" H 5950 5450 50  0001 C CNN
+F 0 "#PWR018" H 5950 5450 50  0001 C CNN
 F 1 "GND" H 5955 5527 50  0000 C CNN
 F 2 "" H 5950 5700 50  0001 C CNN
 F 3 "" H 5950 5700 50  0001 C CNN
@@ -671,12 +660,12 @@ F 3 "" H 5950 5700 50  0001 C CNN
 	-1   0    0    -1  
 $EndComp
 $Comp
-L Driver_FET:IR2104 U?
+L Driver_FET:IR2104 U1
 U 1 1 693C10DF
 P 5650 5000
-F 0 "U?" H 5700 5000 50  0000 C CNN
+F 0 "U1" H 5700 5000 50  0000 C CNN
 F 1 "IR2104" H 5650 5100 50  0000 C CNN
-F 2 "" H 5650 5000 50  0001 C CIN
+F 2 "0_my_footprints:myDip8" H 5650 5000 50  0001 C CIN
 F 3 "https://www.infineon.com/dgdl/ir2104.pdf?fileId=5546d462533600a4015355c7c1c31671" H 5650 5000 50  0001 C CNN
 	1    5650 5000
 	1    0    0    -1  
@@ -689,7 +678,7 @@ $Comp
 L Transistor_FET:IRLZ44N Q1
 U 1 1 61C50415
 P 6750 4950
-F 0 "Q1" H 6954 4996 50  0001 L CNN
+F 0 "Q1" H 7050 5050 50  0000 L CNN
 F 1 "IRF520N" H 6950 4950 50  0000 L CNN
 F 2 "0_my_footprints:myThreeLegged" H 7000 4875 50  0001 L CIN
 F 3 "http://www.irf.com/product-info/datasheets/data/irlz44n.pdf" H 6750 4950 50  0001 L CNN
@@ -700,7 +689,7 @@ $Comp
 L Diode:1N4001 D2
 U 1 1 61BE277E
 P 6850 4500
-F 0 "D2" V 6804 4580 50  0001 L CNN
+F 0 "D2" V 6804 4580 50  0000 L CNN
 F 1 "1N5818" V 6850 4600 50  0000 L CNN
 F 2 "0_my_footprints:myDiodeSchotsky" H 6850 4325 50  0001 C CNN
 F 3 "http://www.vishay.com/docs/88503/1n4001.pdf" H 6850 4500 50  0001 C CNN
@@ -720,7 +709,7 @@ F 3 "" H 6250 4200 50  0001 C CNN
 $EndComp
 Text GLabel 7050 4650 2    50   Input ~ 0
 PUMP-
-Text GLabel 2700 3850 3    50   Input ~ 0
+Text GLabel 2400 3850 3    50   Input ~ 0
 PUMP
 $Comp
 L power:GND #PWR017
@@ -756,21 +745,21 @@ F 3 "" H 2050 3500 50  0001 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L Diode:1N4001 D?
+L Diode:1N4001 D3
 U 1 1 6951D2E2
 P 4450 4450
-F 0 "D?" V 4404 4530 50  0001 L CNN
-F 1 "1N5818" H 4300 4300 50  0000 L CNN
+F 0 "D3" V 4404 4530 50  0001 L CNN
+F 1 "1N5818" H 4300 4600 50  0000 L CNN
 F 2 "0_my_footprints:myDiodeSchotsky" H 4450 4275 50  0001 C CNN
 F 3 "http://www.vishay.com/docs/88503/1n4001.pdf" H 4450 4450 50  0001 C CNN
 	1    4450 4450
-	0    1    1    0   
+	0    -1   -1   0   
 $EndComp
 $Comp
-L Device:R R?
+L Device:R R5
 U 1 1 6959F45E
 P 4450 4750
-F 0 "R?" V 4350 4700 50  0001 L CNN
+F 0 "R5" V 4350 4700 50  0000 L CNN
 F 1 "10K" V 4450 4750 50  0000 C CNN
 F 2 "0_my_footprints:myResistor" V 4380 4750 50  0001 C CNN
 F 3 "~" H 4450 4750 50  0001 C CNN
@@ -785,10 +774,10 @@ Connection ~ 4450 5000
 Wire Wire Line
 	4450 5000 4750 5000
 $Comp
-L power:+3V3 #PWR?
+L power:+3V3 #PWR07
 U 1 1 695A70B3
 P 4450 4300
-F 0 "#PWR?" H 4450 4150 50  0001 C CNN
+F 0 "#PWR07" H 4450 4150 50  0001 C CNN
 F 1 "+3V3" V 4450 4500 50  0000 C CNN
 F 2 "" H 4450 4300 50  0001 C CNN
 F 3 "" H 4450 4300 50  0001 C CNN
@@ -802,4 +791,15 @@ Wire Wire Line
 Connection ~ 5200 5000
 Wire Wire Line
 	5200 5000 5350 5000
+$Comp
+L Connector_Generic:Conn_01x02 J8
+U 1 1 6931ED47
+P 1250 5500
+F 0 "J8" H 1250 5150 50  0000 C CNN
+F 1 "PUMP" H 1250 5250 50  0000 C CNN
+F 2 "0_my_footprints:myPheonix2x3.81_right" H 1250 5500 50  0001 C CNN
+F 3 "~" H 1250 5500 50  0001 C CNN
+	1    1250 5500
+	-1   0    0    1   
+$EndComp
 $EndSCHEMATC

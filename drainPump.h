@@ -4,6 +4,8 @@
 
 #pragma once
 
+#define WITH_PLOT	1
+
 #include <myIOTDevice.h>
 
 
@@ -92,7 +94,8 @@
 
 #define ID_CLEAR_ERROR			"CLEAR_ERROR"		// a UI command to clear the error state, if any
 #define ID_LED_BRIGHTNESS		"LED_BRIGHTNESS"	// int; Default=32; min=10; max=255
-#define ID_HISTORY_LINK     	"HISTORY_LINK"
+#define ID_HISTORY_LINK     	"HISTORY"
+#define ID_CHART_LINK			"CHART"
 
 
 // STATE
@@ -128,6 +131,7 @@ public:
  	static uint32_t	_error_code;		// enum
 	static int		_led_brightness;	// 1..254
 	static String 	_history_link;		// built string
+	static String 	_chart_link;
 
     static time_t   _time_last_run;
     static int      _since_last_run;
@@ -152,9 +156,10 @@ public:
 
 	// plotting
 
-
-	virtual bool hasPlot() override    { return true; }
-
+	#if WITH_PLOT
+		virtual bool hasPlot() override    { return true; }
+	#endif
+	
 };
 
 

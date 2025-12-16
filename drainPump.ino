@@ -8,6 +8,7 @@
 
 #include "drainPump.h"
 #include <myIOTLog.h>
+#include <myIOTDataLog.h>
 #include <Adafruit_NeoPixel.h>
 
 
@@ -50,9 +51,10 @@ static int 		last_sensor_high = -1;
 //----------------------------------
 // plotting
 //----------------------------------
+#if WITH_PLOT
+	static const char *plot_legend = "high,low,hwet,lwet,pump,cool,max";
+#endif
 
-static const char *plot_legend = "high,low,hwet,lwet,pump,cool,max";
-			
 //--------------------------------
 // pixels
 //--------------------------------
@@ -116,6 +118,7 @@ static valueIdType dash_items[] = {
     ID_DUR_LAST_RUN,
 	ID_LED_BRIGHTNESS,
 	ID_HISTORY_LINK,
+	ID_CHART_LINK,
     0
 };
 
@@ -156,12 +159,45 @@ const valDescriptor drain_pump_values[] =
     {ID_SINCE_LAST_RUN, VALUE_TYPE_INT,     VALUE_STORE_PUB,    VALUE_STYLE_HIST_TIME,  (void *) &drainPump::_since_last_run,NULL,   { .int_range = { 0, DEVICE_MIN_INT, DEVICE_MAX_INT}}  },
     {ID_DUR_LAST_RUN,   VALUE_TYPE_INT,     VALUE_STORE_PUB,    VALUE_STYLE_READONLY,   (void *) &drainPump::_dur_last_run,  NULL,   { .int_range = { 0, 0, DEVICE_MAX_INT}}  },
     {ID_HISTORY_LINK,   VALUE_TYPE_STRING,  VALUE_STORE_PUB,    VALUE_STYLE_READONLY,   (void *) &drainPump::_history_link, },
+	{ID_CHART_LINK,		VALUE_TYPE_STRING,	VALUE_STORE_PUB,	VALUE_STYLE_READONLY,	(void *) &drainPump::_chart_link, },
 
 };
 
 
-
 #define NUM_DRAIN_PUMP_VALUES (sizeof(drain_pump_values)/sizeof(valDescriptor))
+
+//----------------------------------------
+// chart stuff
+//----------------------------------------
+// 2025-12-17 made 4 changes, retaining
+// the scaling by 10 and current sampling scheme.
+//
+//	(a) Only chart upward moves when the pump is off
+//  (b) Chart every move when the pump is on
+//  (c) Always chart the most current actual point
+//  (d) Most difficult: add "since" JS param to ADD
+//      only new points since the (the one before) the
+//      last one displayed.
+
+
+extern void addDrainHistory(bool pump_on, int sensor_low, int sensor_high);
+	// defined in drainHistory.h
+
+logColumn_t  drain_cols[] = {
+	{"low",		LOG_COL_TYPE_UINT32,		200,},
+	{"high",	LOG_COL_TYPE_UINT32,		200,},
+	{"pump",	LOG_COL_TYPE_UINT32,		1,},
+};
+
+myIOTDataLog drainPump_datalog("drainData",3,drain_cols,0);
+	// extern'd in aircoHistory.cpp
+	// 0 = debug_send_data level
+
+
+
+//----------------------------------------
+// vars
+//----------------------------------------
 
 drainPump *drain_pump;
 
@@ -181,6 +217,7 @@ time_t   	drainPump::_time_last_run;
 int      	drainPump::_since_last_run;
 int      	drainPump::_dur_last_run;
 String   	drainPump::_history_link;
+String   	drainPump::_chart_link;
 
 time_t 		drainPump::m_run_start;
 uint32_t 	drainPump::m_error_code = ERROR_NONE;
@@ -222,7 +259,21 @@ void setup()
     drain_pump->_history_link += drain_pump->getUUID();
     drain_pump->_history_link += "' target='_blank'>History</a>";
 
+#if WITH_PLOT
 	drain_pump->setPlotLegend(plot_legend);
+#endif
+
+	LOGI("Inititalizing drainPump Chart");
+	String html = drainPump_datalog.getChartHTML(
+		300,		// height
+		600,		// width
+		86400,		// default period for the chart (1 day)
+		0 );		// default refresh interval
+
+	// note that drain_chart.html must be uploaded to SPIFFS by hand
+	drain_pump->_chart_link = "<a href='/spiffs/drain_chart.html?uuid=";
+	drain_pump->_chart_link += drain_pump->getUUID();
+	drain_pump->_chart_link += "' target='_blank'>Chart</a>";
 
 	setPixelsBrightness(drain_pump->_led_brightness);
 	setPixel(PIXEL_SYSTEM,MY_LED_BLACK);
@@ -418,6 +469,17 @@ void drainPump::handlePump()
 {
     uint32_t now = millis();
     time_t time_now = time(NULL);
+	static bool update_chart_history = false;
+
+	//------------------------------------------------------
+	// let drainHistory.cpp decide on encoding
+	//------------------------------------------------------
+
+	if (update_chart_history)
+	{
+		update_chart_history = false;
+		addDrainHistory(pump_on,sensor_low,sensor_high);
+	}
 
     //--------------------------------------
     // Sample sensors on interval
@@ -432,6 +494,7 @@ void drainPump::handlePump()
         last_chk = now;
         int high = readSensor(PIN_SENSOR_HIGH,&sensor_high);
 		int low = readSensor(PIN_SENSOR_LOW,&sensor_low);
+		update_chart_history = true;
 
 		low_wet = sensor_low > _low_thresh ? 1:0;
 		high_wet = sensor_high > _high_thresh ? 1:0;
@@ -448,6 +511,7 @@ void drainPump::handlePump()
 			 sensor_high,
 			 high_wet);
 
+#if WITH_PLOT
 		// if myIOTDevice::_plot_data is ON,
 		// created and broadcast the json
 
@@ -475,6 +539,8 @@ void drainPump::handlePump()
 				1000);
 				wsBroadcast(plot_buf);
 		}
+#endif
+
     }
 
     //--------------------------------------
@@ -502,6 +568,7 @@ void drainPump::handlePump()
 				LOGU("PUMP OFF due to DRAIN_MODE_OFF");
                 pumpOn(0);
 				updateUI();
+				update_chart_history = true;
             }
             return;
 
@@ -512,6 +579,7 @@ void drainPump::handlePump()
                 pumpOn(1);
 				m_run_start = time_now;
 				updateUI();
+				update_chart_history = true;
             }
             return;
     }
@@ -531,6 +599,7 @@ void drainPump::handlePump()
                 pump_state = PUMP_ON;
 				m_run_start = time_now;
 				updateUI();
+				update_chart_history = true;
             }
             break;
 
@@ -569,6 +638,7 @@ void drainPump::handlePump()
                 cooldown_end = now + (_cooldown_time * 1000);
 				endRun(time_now);
 				updateUI();
+				update_chart_history = true;
 			}
             break;
 
@@ -578,9 +648,12 @@ void drainPump::handlePump()
 				LOGU("COOLDOWN time complete");
                 pump_state = PUMP_OFF;
 				updateUI();
+				update_chart_history = true;
             }
             break;
     }
+
+
 }
 
 

@@ -32,6 +32,7 @@ static uint32_t cooldown_end = 0;
 static int 		pump_on = 0;
 static int		high_wet = 0;
 static int		low_wet = 0;
+static int		low_off = 0;
 static int 		sensor_low = 0;
 static int 		sensor_high = 0;
 
@@ -44,6 +45,7 @@ static PumpState last_pump_state = PUMP_ILLEGAL;
 static int 		last_pump_on = -1;
 static int		last_high_wet = -1;
 static int		last_low_wet = -1;
+static int		last_low_off = -1;
 static int 		last_sensor_low = -1;
 static int 		last_sensor_high = -1;
 
@@ -52,7 +54,7 @@ static int 		last_sensor_high = -1;
 // plotting
 //----------------------------------
 #if WITH_PLOT
-	static const char *plot_legend = "high,low,hwet,lwet,pump,cool,max";
+	static const char *plot_legend = "high,low,pump,max";
 #endif
 
 //--------------------------------
@@ -97,14 +99,13 @@ static void setPixel(int num, uint32_t color)	{pixels.setPixelColor(num,color);}
 enumValue drainModes[] = {
 	"Off",
 	"FORCE",
-	"HIGH",
-	"BOTH",
+	"HIGH_ON",
+	"LOW_ON",
     0};
 
 enumValue errorCodes[] = {
 	"",
-	"TOO_LONG_BOTH",
-	"HIGH_CYCLING",
+	"TOO_LONG",
     0};
 
 
@@ -128,7 +129,8 @@ static valueIdType config_items[] = {
 	ID_NUM_SAMPLES,
 	ID_HIGH_THRESH,
 	ID_LOW_THRESH,
-	ID_HIGH_TIME,
+	ID_LOW_OFF_THRESH,
+	ID_RUN_TIME,
 	ID_MAX_TIME,
 	ID_COOLDOWN_TIME,
 	0
@@ -145,12 +147,13 @@ const valDescriptor drain_pump_values[] =
 	{ID_CLEAR_ERROR,    VALUE_TYPE_COMMAND, VALUE_STORE_SUB,    VALUE_STYLE_NONE,       NULL,                     				(void *) drainPump::clearError },
 
  	{ID_UI_INTERVAL,  	VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_ui_interval,		NULL,	{ .int_range = {1000,1000,30000}}, 	},
- 	{ID_CHK_INTERVAL,  	VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_chk_interval,		NULL,	{ .int_range = {200, 100, 30000}}, 	},
- 	{ID_NUM_SAMPLES,  	VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_num_samples,		NULL,	{ .int_range = {20,	 1,   MAX_SAMPLES}}, 	},
- 	{ID_HIGH_THRESH,  	VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_high_thresh,		NULL,	{ .int_range = {100, 0,   4094}}, 	},
- 	{ID_LOW_THRESH,  	VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_low_thresh,		NULL,	{ .int_range = {100, 0,   4094}}, 	},
- 	{ID_HIGH_TIME,		VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_high_time,		NULL,	{ .int_range = {30,  10,  180}}, 	},
- 	{ID_MAX_TIME,		VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_max_time,			NULL,	{ .int_range = {90,  30,  300}}, 	},
+ 	{ID_CHK_INTERVAL,  	VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_chk_interval,		NULL,	{ .int_range = {5000,100, 30000}}, 	},
+ 	{ID_NUM_SAMPLES,  	VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_num_samples,		NULL,	{ .int_range = {5,	 1,   MAX_SAMPLES}}, 	},
+ 	{ID_HIGH_THRESH,  	VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_high_thresh,		NULL,	{ .int_range = {20,  0,   4094}}, 	},
+ 	{ID_LOW_THRESH,  	VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_low_thresh,		NULL,	{ .int_range = {500, 0,   4094}}, 	},
+ 	{ID_LOW_OFF_THRESH, VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_low_off_thresh,	NULL,	{ .int_range = {50,  0,   4094}}, 	},
+ 	{ID_RUN_TIME,		VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_run_time,			NULL,	{ .int_range = {0,   0,   180}}, 	},
+ 	{ID_MAX_TIME,		VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_max_time,			NULL,	{ .int_range = {120, 30,  360}}, 	},
  	{ID_COOLDOWN_TIME,  VALUE_TYPE_INT,  	VALUE_STORE_PREF, 	VALUE_STYLE_NONE,		(void *) &drainPump::_cooldown_time,    NULL,	{ .int_range = {30,  10,  900}}, 	},
 
 	{ID_LED_BRIGHTNESS, VALUE_TYPE_INT, 	VALUE_STORE_PREF,	VALUE_STYLE_NONE,		(void *) &drainPump::_led_brightness,	(void *) drainPump::onBrightnessChanged, { .int_range = { DEFAULT_LED_BRIGHTNESS,  10,  255}} },
@@ -209,7 +212,8 @@ int   		drainPump::_chk_interval;
 int   		drainPump::_num_samples;
 int   		drainPump::_high_thresh;
 int   		drainPump::_low_thresh;
-int   		drainPump::_high_time;
+int   		drainPump::_low_off_thresh;
+int   		drainPump::_run_time;
 int   		drainPump::_max_time;
 int   		drainPump::_cooldown_time;
 int			drainPump::_led_brightness;
@@ -308,16 +312,8 @@ void drainPump::pumpOn(bool on)
 }
 
 
-void drainPump::onDrainModeChanged(const myIOTValue *value, uint32_t val)
-	// called BEFORE the member variable has changed
-	// asynchrounous to loop(); since this takes some time,
-	// we explicitly set _drain_mode as soon as practicalble
+static void initChange()
 {
-	LOGU("onDrainModeChanged(%d)",val);
-	if (pump_on)
-		drain_pump->endRun(time(NULL));
-	drain_pump->_drain_mode = val;
-
 	// re-initialize state machine on any mode changes
 
 	last_ui = 0;
@@ -347,9 +343,32 @@ void drainPump::onDrainModeChanged(const myIOTValue *value, uint32_t val)
 	drain_pump->_error_code = ERROR_ILLEGAL;
 	drain_pump->m_error_code = ERROR_NONE;
 
-	pumpOn(0);
+	drainPump::pumpOn(0);
 	drain_pump->updateUI();
 }
+
+
+void drainPump::onDrainModeChanged(const myIOTValue *value, uint32_t val)
+	// called BEFORE the member variable has changed
+	// asynchrounous to loop(); since this takes some time,
+	// we explicitly set _drain_mode as soon as practicalble
+{
+	LOGU("onDrainModeChanged(%d)",val);
+	if (pump_on)
+		drain_pump->endRun(time(NULL));
+	drain_pump->_drain_mode = val;
+	initChange();
+}
+
+void drainPump::onRunTimeChanged(const myIOTValue *value, int val)
+{
+	LOGU("onDrainModeChanged(%d)",val);
+	if (pump_on)
+		drain_pump->endRun(time(NULL));
+	drain_pump->_run_time = val;
+	initChange();
+}
+
 
 void drainPump::onBrightnessChanged(const myIOTValue *desc, uint32_t val)
 {
@@ -371,6 +390,7 @@ void drainPump::updateUI()
 	if (last_pump_on		!= pump_on		||
 		last_high_wet	    != high_wet	    ||
 		last_low_wet	    != low_wet	    ||
+		last_low_off		!= low_off		||
 		last_sensor_low	    != sensor_low	||
 		last_sensor_high	!= sensor_high  ||
 		last_pump_state	    != pump_state	)
@@ -378,14 +398,16 @@ void drainPump::updateUI()
 		last_pump_on		= pump_on	     ;
 		last_high_wet	    = high_wet	     ;
 		last_low_wet	    = low_wet	     ;
+		last_low_off		= low_off		 ;
 		last_sensor_low	    = sensor_low     ;
 		last_sensor_high	= sensor_high    ;
 		last_pump_state	    = pump_state     ;
 
 		static char buf[255];
-		sprintf(buf,"%s pump_on(%d) low(%d)=%s high(%d)=%s",
+		sprintf(buf,"%s pump_on(%d) low_off=%d low(%d)=%s high(%d)=%s",
 			pump_state_names[(int)pump_state],
 			pump_on,
+			low_off,
 			sensor_low,
 			(low_wet?"wet":"dry"),
 			sensor_high,
@@ -447,7 +469,6 @@ void drainPump::handlePixels()
 		setPixel(PIXEL_STATE,state_blink_on?color_state:MY_LED_BLACK);
 		changed = 1;
 	}
-
 	if (changed || force_pixels)
 	{
 		force_pixels = 0;
@@ -460,9 +481,6 @@ void drainPump::handlePixels()
 //-----------------------------------------------------------------------
 // handlePump()
 //-----------------------------------------------------------------------
-
-
-#define SENSOR_THRESHOLD  2048
 
 
 void drainPump::handlePump()
@@ -498,12 +516,14 @@ void drainPump::handlePump()
 
 		low_wet = sensor_low > _low_thresh ? 1:0;
 		high_wet = sensor_high > _high_thresh ? 1:0;
+		low_off = sensor_low < _low_off_thresh ? 1:0;
 
-		LOGV("mode(%d) err(%d) on(%d) state(%d) cur/avg/wet low(%4d,%4d,%d) high(%4d,%4d,%d)",
+		LOGV("mode(%d) err(%d) on(%d) state(%d) off=%d cur/avg/wet low(%4d,%4d,%d) high(%4d,%4d,%d)",
 			 _drain_mode,
 			 m_error_code,
 			 pump_on,
 			 pump_state,
+			 low_off,
 			 low,
 			 sensor_low,
 			 low_wet,
@@ -519,25 +539,21 @@ void drainPump::handlePump()
 		{
 			// static const char *plot_legend = "high,low,hwet,lwet,pump,cool,400,0";
 			static char plot_buf[255];
-			int is_cool = pump_state == PUMP_COOLDOWN ? 1 : 0;
 
 			// set a scaling maximum at least 50 above highest value
 			
-			int max = 400;
+			int max = 500;
 			if (sensor_low+50 > max)
 				max = sensor_low + 50;
 			if (sensor_high+50 > max)
 				max = sensor_high + max;
 
-			sprintf(plot_buf,"{\"plot_data\":[%d,%d,%d,%d,%d,%d,%d]}",
+			sprintf(plot_buf,"{\"plot_data\":[%d,%d,%d,%d]}",
 				sensor_high,
 				sensor_low,
-				high_wet*800,
-				low_wet*700,
-				pump_on*900,
-				is_cool*900,
-				1000);
-				wsBroadcast(plot_buf);
+				pump_on*300,
+				max);
+			wsBroadcast(plot_buf);
 		}
 #endif
 
@@ -591,9 +607,19 @@ void drainPump::handlePump()
     switch (pump_state)
     {
         case PUMP_OFF:
-            if (high_wet)   // high sensor wet
+			if (_drain_mode == DRAIN_MODE_LOW && low_wet)   // low sensor wet
             {
-				LOGU("PUMP ON");
+				LOGU("PUMP ON LOW");
+                pumpOn(1);
+                pump_start = now;
+                pump_state = PUMP_ON;
+				m_run_start = time_now;
+				updateUI();
+				update_chart_history = true;
+            }
+            if (_drain_mode == DRAIN_MODE_HIGH && high_wet)   // high sensor wet
+            {
+				LOGU("PUMP ON HIGH");
                 pumpOn(1);
                 pump_start = now;
                 pump_state = PUMP_ON;
@@ -604,36 +630,29 @@ void drainPump::handlePump()
             break;
 
         case PUMP_ON:
-            if (_drain_mode == DRAIN_MODE_HIGH)
+            if (_run_time)
             {
-                if (now - pump_start >= (_high_time * 1000))
+                if (now - pump_start >= (_run_time * 1000))
                 {
-					LOGU("PUMP OFF (due to HIGH_TIME)");
-                    pump_state = PUMP_COOLDOWN;
-					if (sensor_high)
-					{
-						LOGE("HIGH_CYCLING - sensor_high was stil 'wet' when HIGH_TIME was reached");
-						m_error_code = ERROR_HIGH_CYCLING;
-					}
-                }
-            }
-            else if (_drain_mode == DRAIN_MODE_BOTH)
-            {
-                if (!low_wet)   // low sensor dry
-                {
-					LOGU("PUMP OFF (due to SENSOR_LOW dry)");
-                    pump_state = PUMP_COOLDOWN;
-                }
-                else if (now - pump_start >= (_max_time * 1000))
-                {
-					LOGE("PUMP OFF (due to MAX_TIME)");
-                    m_error_code = ERROR_TOO_LONG_BOTH;
+					LOGU("PUMP OFF RUN_TIME");
                     pump_state = PUMP_COOLDOWN;
                 }
             }
+            else if (low_off)
+            {
+ 				LOGU("PUMP OFF LOW_OFF");
+                pump_state = PUMP_COOLDOWN;
+            }
+			else if (now - pump_start >= (_max_time * 1000))
+			{
+				LOGE("PUMP OFF MAX");
+				m_error_code = ERROR_TOO_LONG;
+				pump_state = PUMP_COOLDOWN;
+			}
+
 			if (pump_state == PUMP_COOLDOWN)
 			{
-				LOGI("starting COOLDOWN %d seconds",_cooldown_time);
+				LOGI("COOLDOWN %d seconds",_cooldown_time);
 				pumpOn(0);
                 cooldown_end = now + (_cooldown_time * 1000);
 				endRun(time_now);
@@ -652,8 +671,6 @@ void drainPump::handlePump()
             }
             break;
     }
-
-
 }
 
 

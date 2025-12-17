@@ -30,60 +30,54 @@
 //------------------------
 // myIOT definition
 //------------------------
-// In the worst case of both sensors constantly reading WET:
-// 	in HIGH mode the pump will have a duty cycle of HIGH_TIME on, and COOLDOWN_TIME off;
-// 	in LOW mode the pump will have a duty cycle of MAX_TIME on and COOLDOWN_TIME off.
-// There is no provision for sensing that the air conditioner is running and the HIGH
-//	SENSOR_HIGH never registers as wet.
+// The pump can turn on based on two different conditions HIGH or LOW.
+// The pump can turn off based on a timer or low>LOW_OFF_THRESH
+// There is protection against overly long runs with MAX_TIME.
+// There is added hysterisis protection with COOLDOWN_TIME
 
 #define DRAIN_PUMP				"drain_pump"
 #define DRAIN_PUMP_VERSION		"dp1.0"
 #define DRAIN_PUMP_URL			"https://github.com/phorton1/Arduino-boat-drainPump"
 
-
 #define DRAIN_MODE_OFF			0
 #define DRAIN_MODE_FORCE		1
-#define DRAIN_MODE_HIGH			2
-#define DRAIN_MODE_BOTH			3
+#define DRAIN_MODE_HIGH			2	// turns on at high>HIGH_THRESH
+#define DRAIN_MODE_LOW			3	// turns on at low>LOW_THRESH
 
 #define ERROR_NONE				0
-#define ERROR_TOO_LONG_BOTH		1	// ran for MAX seconds waiting for low to go dry
-#define ERROR_HIGH_CYCLING		2	// HIGH sensor was still wet when HIGH_TIME ended
-#define ERROR_ILLEGAL			3	// used to force redisplay
+#define ERROR_TOO_LONG			1	// ran for MAX_TIME seconds waiting for low to go dry
+#define ERROR_ILLEGAL			2	// used to force redisplay
 
 // CONFIGURATION
 
 #define ID_DRAIN_MODE			"DRAIN_MODE"
-	// enum: OFF, FORCE, HIGH, or BOTH
-	// OFF will turns the pump off
-	// FORCE will force the pump ON
-	// HIGH/BOTH modes use CHK_INTERVAL to check the sensors and possibly turn the pump ON/OFF
-	// HIGH turns the pump on when SENSOR_HIGH is wet and runs it for HIGH_TIME seconds
-	// BOTH turns the pump on when SENSOR_HIGH is wet and turns it off when SENSOR_LOW is dry
 
 #define ID_UI_INTERVAL			"UI_INTERVAL"	// int milliseconds; default=1000; min=1000; max=30000 (5 minutes)
 	// How often do we update the webUI.
 	
-#define ID_CHK_INTERVAL			"CHK_INTERVAL"	// int milliseconds; Default=200; min=100; max=30000 (30 seconds)
-	// How often do we sample the sensors into the circular buffers, and, if HIGH or BOTH
-	// how often we check to turn the pump on or off based on the CONFIGURATION values.
+#define ID_CHK_INTERVAL			"CHK_INTERVAL"	// int milliseconds; Default=5000; min=100; max=30000 (30 seconds)
+	// How often do we sample the sensors into the circular buffers when the pump is off
+	// We sense once per second once the pump is on.
 
-#define ID_NUM_SAMPLES			"NUM_SAMPLES"	// int; default=20, min=1, max=60;
+#define ID_NUM_SAMPLES			"NUM_SAMPLES"	// int; default=5, min=1, max=60;
 	// The number of samples in the circular buffer.
-	// This is coupled with CHK_INTERVAL to determin the actual update frequency for turning the pump ON/OFf.
+	// This is coupled with CHK_INTERVAL to determine the actual update frequency for turning the pump ON,
+	// and the one second fixed interval for turning the pump off
 
-#define ID_HIGH_THRESH			"HIGH_THRESH"	// int; default=100;  min=0; max=4094;
-#define ID_LOW_THRESH			"LOW_THRESH"	// int; default=100;  min=0; max=4094;
-	// In HIGH/BOTH modes, the pump is turned on if SENSOR_HIGH (average) is > HIGH_THRESH
-	// In BOTH mode the pump is turned off if was turned on at high and the SENSOR_LOW (average is <= LOW_THRESH.
+#define ID_HIGH_THRESH			"HIGH_THRESH"		// int; default=20;   min=1; max=4094;
+#define ID_LOW_THRESH			"LOW_THRESH"		// int; default=500;  min=1; max=4094;
+#define ID_LOW_OFF_THRESH		"LOW_OFF_THRESH"	// int; default=50;	  min=10; max=4094;
+	// Thresholds for turning the pump on and off.
+	// LOW_OFF_THRESH must be substantially below LOW_THRESH
 
-#define ID_HIGH_TIME			"HIGH_TIME"		// int seconds; Default=30; min=10; Max=180 (23 minutes)
-	// In HIGH mode this determines how long the pump will run.
-	// If the high sensor is still "wet" after this period, thw UI will recieve ERROR_HIGH_CYCLING
+#define ID_RUN_TIME				"RUN_TIME"				// int seconds; Default=0; min=0; max=180 (3 minutes)
+	// If non-zero this will put the pump in "timer" mode where it will turn off after running for
+	// this many seconds; If zero the pump will turn off based on LOW_OFF_THRESH.
+	// Must be less than MAX_TIME if non-zero
 
-#define ID_MAX_TIME				"MAX_TIME"		// int seconds; Default=90; min=30; Max=300	(5 minutes)
-	// In BOTH mode the pump will be turned off after this many seconds in case the LOW (SENSOR_LOW) never indicates dry.
-	// If this occurs the UI will recieve ERROR_TOO_LONG_BOTH
+#define ID_MAX_TIME				"MAX_TIME"			// int seconds; Default=120; min=30; Max=360	(6 minutes)
+	// In any automatic mode the pump will be turned off after this many seconds in case the LOW (SENSOR_LOW).
+	// never indicates dry.
 
 #define ID_COOLDOWN_TIME		"COOLDOWN_TIME"		// int seconds; Default=30 seconds; Min=10; Max=900 (15 minutes)
 	// After a HIGH/BOTH pump run, we will wait this many seconds before begining
@@ -121,9 +115,10 @@ public:
 	static int		_ui_interval;		// milliseconds
 	static int		_chk_interval;		// milliseconds
 	static int		_num_samples;		// int
-	static int 		_high_thresh;		// vs average of analog reads
-	static int 		_low_thresh;		// vs average of analog reads
-	static int		_high_time;			// seconds
+	static int		_high_thresh;		// vs average of analog reads
+	static int		_low_thresh;		// vs average of analog reads
+	static int		_low_off_thresh;	// vs average of analog reads
+	static int		_run_time;			// seconds
 	static int		_max_time;			// seconds
 	static int		_cooldown_time;		// seconds
 
@@ -138,6 +133,7 @@ public:
     static int      _dur_last_run;
 
 	static void onDrainModeChanged(const myIOTValue *value, uint32_t val);
+	static void onRunTimeChanged(const myIOTValue *value, int val);
 	static void onBrightnessChanged(const myIOTValue *desc, uint32_t val);
 	static void clearError();
     virtual String onCustomLink(const String &path,  const char **mime_type) override;

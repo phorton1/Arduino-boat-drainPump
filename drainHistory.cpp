@@ -8,7 +8,7 @@
 //		- a chart_history of sensor values and pump on/off for charting
 //		  This chart_history is event driven when the levels change by a
 //		  certain amount (scaled by 10) and the pump is turned on/off.
-//        This chart_history is currently eemory based and large enough to
+//        This chart_history is currently memory based and large enough to
 //		  keep approximately 24 hours worth of data for analysis.
 //
 // HTML Text Entry points:  endRun() and onCustomLink() -> getHTML()
@@ -282,15 +282,6 @@ static uint8_t last_high;
 static bool	   last_pump_on;
 
 
-// actual (most recent) last values
-
-static uint32_t most_recent_dt;
-static uint8_t  most_recent_low;
-static uint8_t  most_recent_high;
-static bool		most_recent_pump_on;
-
-
-
 static String series_colors = "[ \"#00ff00\", \"#0000ff\", \"#ff0000\", \"#888888\" ]";
 
 
@@ -318,12 +309,6 @@ static void addDrainHistoryRec(uint32_t dt, uint8_t low, uint8_t high,  bool pum
 }
 
 
-static void debugMostRecent(const char *what, uint32_t dt, uint8_t low, uint8_t high, bool pump_on)
-{
-	String ts = timeToString(dt);
-	LOGD("mostRecent(%s) %s  low(%d) high(%d) pump_on(%d)",what,ts.c_str(),low,high,pump_on);
-}
-
 
 void addDrainHistory(bool pump_on, int sensor_low, int sensor_high)
 	// extern'd in airco.cpp
@@ -342,54 +327,14 @@ void addDrainHistory(bool pump_on, int sensor_low, int sensor_high)
 		sensor_high = 127;
 	}
 
-
-	// if the pump is on, we are charting every changed value
-	// so we set the most_recent_dt to 0 to indicate not to send it
-
-	if (pump_on)
+	if (pump_on != last_pump_on ||
+		low != last_low ||
+		high != last_high)
 	{
-		if (!last_pump_on ||
-			low != last_low ||
-			high != last_high)
-		{
-			last_pump_on = pump_on;
-			last_low = low;
-			last_high = high;
-			addDrainHistoryRec(dt,low,high,pump_on);
-			most_recent_dt = 0;
-		}
-		else
-		{
-			most_recent_dt = dt;
-			most_recent_low = low;
-			most_recent_high = high;
-			most_recent_pump_on = pump_on;
-
-			debugMostRecent("PUMP_ON",dt,low,high,pump_on);
-		}
-	}
-	else	// !pump_on
-	{
-		if (last_pump_on ||
-			low > last_low ||
-			high > last_high)
-		{
-			last_pump_on = pump_on;
-			last_low = low;
-			last_high = high;
-
-			addDrainHistoryRec(dt,low,high,pump_on);
-			most_recent_dt = 0;
-		}
-		else
-		{
-			most_recent_dt = dt;
-			most_recent_low = low;
-			most_recent_high = high;
-			most_recent_pump_on = pump_on;
-
-			debugMostRecent("PUMP_OFF",dt,low,high,pump_on);
-		}
+		last_pump_on = pump_on;
+		last_low = low;
+		last_high = high;
+		addDrainHistoryRec(dt,low,high,pump_on);
 	}
 }
 
@@ -447,10 +392,12 @@ String drainPump::onCustomLink(const String &path,  const char **mime_type)
 		{
 			uint32_t secs = myiot_web_server->getArg("secs",0);
 			cutoff = time(NULL) - secs;
+				// UPDATE means "later than or equal" to dt
 		}
 		else
 		{
-			cutoff = myiot_web_server->getArg("since",0);
+			cutoff = myiot_web_server->getArg("since",0) + 1;
+				// SINCE means "later than" to dt
 		}
 
 		int tail = chart_tail;
@@ -471,20 +418,6 @@ String drainPump::onCustomLink(const String &path,  const char **mime_type)
 		while (tail < head)
 		{
 			if (!sendOne(cutoff,&chart_history[tail++]))
-				return "";
-		}
-
-		if (most_recent_dt)
-		{
-			debugMostRecent("SEND",most_recent_dt,most_recent_low,most_recent_high,most_recent_pump_on);
-
-			chartHistory_t most_recent_rec;
-			most_recent_rec.dt = most_recent_dt;
-			most_recent_rec.low = most_recent_low;
-			most_recent_rec.high = most_recent_high;
-			if (most_recent_pump_on)
-				most_recent_rec.high |= 0x80;
-			if (!sendOne(cutoff,&most_recent_rec))
 				return "";
 		}
 

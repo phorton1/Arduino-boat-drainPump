@@ -366,15 +366,13 @@ String drainPump::onCustomLink(const String &path,  const char **mime_type)
 
 	// CHART stuff
 	
-	if (path.startsWith("chart_html"))
-	{
-		int period = myiot_web_server->getArg("period",7 * 86400);	// week default
-		return datalog.getChartHTML(period);
-	}
-	else if (path.startsWith("chart_header"))
+	if (path.startsWith("chart_header"))
 	{
 		*mime_type = "application/json";
-		return datalog.getChartHeader(&series_colors);
+		return datalog.getChartHeader(86400,0,&series_colors);
+			// 86400 = default_period = week
+			// 0 = with_degrees
+			// uses device specific series colors
 	}
 	else if (path.startsWith("chart_data") ||
 			 path.startsWith("update_chart_data"))

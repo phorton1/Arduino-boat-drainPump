@@ -246,7 +246,7 @@ static String buildHTML()
 #define MAX_HIGH 1270
 
 
-extern myIOTDataLog drainPump_datalog;
+extern myIOTDataLog datalog;
 	// defined in drainPump.ino
 
 typedef struct		// in memory record = 8 bytes per record
@@ -361,34 +361,26 @@ static bool sendOne(uint32_t cutoff, chartHistory_t *in_rec)
 
 
 String drainPump::onCustomLink(const String &path,  const char **mime_type)
-	// called from myIOTHTTP.cpp::handleRequest()
-	// for any paths that start with /custom/
 {
 	LOGD("drainPump::onCustomLink(%s)",path.c_str());
 
 	// CHART stuff
 	
-	if (path.startsWith("chart_html/drainData"))
+	if (path.startsWith("chart_html"))
 	{
-		// only used by drain_chart.html inasmuch as the
-		// chart html is baked into the myIOT widget
-		int height = myiot_web_server->getArg("height",400);
-		int width  = myiot_web_server->getArg("width",800);
 		int period = myiot_web_server->getArg("period",7 * 86400);	// week default
-		int refresh = myiot_web_server->getArg("refresh",0);
-		return drainPump_datalog.getChartHTML(height,width,period,refresh);
+		return datalog.getChartHTML(period);
 	}
-	else if (path.startsWith("chart_header/drainData"))
+	else if (path.startsWith("chart_header"))
 	{
 		*mime_type = "application/json";
-		return drainPump_datalog.getChartHeader(&series_colors,1);
-			// 1 = supports incremental update
+		return datalog.getChartHeader(&series_colors);
 	}
-	else if (path.startsWith("chart_data/drainData") ||
-			 path.startsWith("update_chart_data/drainData"))
+	else if (path.startsWith("chart_data") ||
+			 path.startsWith("update_chart_data"))
 	{
 		uint32_t cutoff = 0;
-		if (path.startsWith("chart_data/drainData"))
+		if (path.startsWith("chart_data"))
 		{
 			uint32_t secs = myiot_web_server->getArg("secs",0);
 			cutoff = time(NULL) - secs;

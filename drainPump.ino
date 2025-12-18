@@ -192,7 +192,7 @@ logColumn_t  drain_cols[] = {
 	{"pump",	LOG_COL_TYPE_UINT32,		1,},
 };
 
-myIOTDataLog drainPump_datalog("drainData",3,drain_cols,0);
+myIOTDataLog datalog("drainData",3,drain_cols,0);
 	// extern'd in aircoHistory.cpp
 	// 0 = debug_send_data level
 
@@ -268,14 +268,7 @@ void setup()
 #endif
 
 	LOGI("Inititalizing drainPump Chart");
-	String html = drainPump_datalog.getChartHTML(
-		300,		// height
-		600,		// width
-		86400,		// default period for the chart (1 day)
-		0 );		// default refresh interval
-
-	// note that drain_chart.html must be uploaded to SPIFFS by hand
-	drain_pump->_chart_link = "<a href='/spiffs/drain_chart.html?uuid=";
+	drain_pump->_chart_link = "<a href='/spiffs/chart.html?uuid=";
 	drain_pump->_chart_link += drain_pump->getUUID();
 	drain_pump->_chart_link += "' target='_blank'>Chart</a>";
 

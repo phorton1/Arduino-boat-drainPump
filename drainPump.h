@@ -126,7 +126,7 @@ public:
  	static uint32_t	_error_code;		// enum
 	static int		_led_brightness;	// 1..254
 	static String 	_history_link;		// built string
-	static String 	_chart_link;
+	static String 	_chart_link;		// built string
 
     static time_t   _time_last_run;
     static int      _since_last_run;

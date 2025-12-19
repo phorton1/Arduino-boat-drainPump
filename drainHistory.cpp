@@ -314,8 +314,6 @@ void addDrainHistory(bool pump_on, int sensor_low, int sensor_high)
 	// extern'd in airco.cpp
 {
 	uint32_t dt = time(NULL);
-	uint8_t low = sensor_low / 10;
-	uint8_t high = sensor_high / 10;
 	if (sensor_low > MAX_LOW)
 	{
 		LOGE("SENSOR_LOW too high for chart(%d)",sensor_low);
@@ -325,6 +323,19 @@ void addDrainHistory(bool pump_on, int sensor_low, int sensor_high)
 	{
 		LOGE("SENSOR_HIGH too high for chart(%d)",sensor_high);
 		sensor_high = 127;
+	}
+
+	// constrain sensors to only going up when the pump is not on
+	// to save memory
+
+	uint8_t low = sensor_low / 10;
+	uint8_t high = sensor_high / 10;
+	if (!pump_on)
+	{
+		if (low < last_low)
+			low = last_low;
+		if (high < last_high)
+			high = last_high;
 	}
 
 	if (pump_on != last_pump_on ||

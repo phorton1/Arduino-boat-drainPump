@@ -101,6 +101,7 @@ enumValue drainModes[] = {
 	"FORCE",
 	"HIGH_ON",
 	"LOW_ON",
+	"BOTH",
     0};
 
 enumValue errorCodes[] = {
@@ -233,7 +234,7 @@ uint32_t 	drainPump::m_error_code = ERROR_NONE;
 
 void setup()
 {
-	drainPump::pumpOn(0);	
+	drainPump::pumpOn(0);
 
 	setPixelsBrightness(INITIAL_LED_BRIGHTNESS);
 	setPixel(PIXEL_SYSTEM,MY_LED_CYAN);
@@ -534,7 +535,7 @@ void drainPump::handlePump()
 			static char plot_buf[255];
 
 			// set a scaling maximum at least 50 above highest value
-			
+
 			int max = 500;
 			if (sensor_low+50 > max)
 				max = sensor_low + 50;
@@ -600,7 +601,9 @@ void drainPump::handlePump()
     switch (pump_state)
     {
         case PUMP_OFF:
-			if (_drain_mode == DRAIN_MODE_LOW && low_wet)   // low sensor wet
+			if (low_wet && (						// low sensor wet
+				_drain_mode == DRAIN_MODE_LOW ||
+				_drain_mode == DRAIN_MODE_BOTH))
             {
 				LOGU("PUMP ON LOW");
                 pumpOn(1);
@@ -610,7 +613,9 @@ void drainPump::handlePump()
 				updateUI();
 				update_chart_history = true;
             }
-            if (_drain_mode == DRAIN_MODE_HIGH && high_wet)   // high sensor wet
+            if (high_wet && (						// high sensor wet
+				_drain_mode == DRAIN_MODE_HIGH ||
+				_drain_mode == DRAIN_MODE_BOTH))
             {
 				LOGU("PUMP ON HIGH");
                 pumpOn(1);
@@ -706,4 +711,3 @@ int drainPump::readSensor(int pin, int *avg)
 	*avg = sum / _num_samples;  // average (0..4095 for 12-bit ADC)
 	return val;
 }
-

@@ -64,7 +64,7 @@ void drainPump::endRun(time_t time_now)
 	// add to circular html_history buffer;
 	// if head collides with tail, bump the tail by one
 	// note that the 'head' slot itself is never valid.
-	
+
 	int head = html_head++;
 	if (html_head >= MAX_HTML_HISTORY)
 		html_head = 0;
@@ -74,7 +74,7 @@ void drainPump::endRun(time_t time_now)
 		if (html_tail >= MAX_HTML_HISTORY)
 			html_tail = 0;
 	}
-	
+
 	// debugging
 
 	num_runs++;
@@ -93,7 +93,7 @@ void drainPump::endRun(time_t time_now)
 	// use the special flag if it was FORCE
 	hist->err   = _drain_mode == DRAIN_MODE_FORCE ?
 		HIST_FLAG_FORCE : (uint16_t) m_error_code;
-		
+
 	m_run_start = 0;
 }
 
@@ -213,7 +213,7 @@ static String buildHTML()
 
 		if (!sendRecordHTML(++num,time_now,rec,prev_rec))
 			return "";
-		
+
 		if (end == tail)
 			done = 1;
 		else
@@ -244,6 +244,16 @@ static String buildHTML()
 
 #define MAX_LOW  2550
 #define MAX_HIGH 1270
+	// maximum values that can be compressed into the uint8_t's
+	// allowing for storing the pump_on bit in chartHistory_t.high
+
+#define RECORD_THRESHOLD 5
+	// To save memory we generally only record upward movements
+	// of the sensor levels when the pump is off.  However, there
+	// is a transient high directly after the pump goes off that
+	// gives misleading readings.  This constant says that if a
+	// downward movement of more than 5 compressed (50 uncompressed)
+	// it will be recorded.
 
 
 extern myIOTDataLog datalog;
@@ -303,7 +313,7 @@ static void addDrainHistoryRec(uint32_t dt, uint8_t low, uint8_t high,  bool pum
 	hist->high 	 = high;
 	if (pump_on)
 		hist->high |= 0x80;
-		
+
 	chart_head = new_head;
 	LOGV("addChartHistoryRecord(%d)",chart_head);
 }
@@ -313,40 +323,57 @@ static void addDrainHistoryRec(uint32_t dt, uint8_t low, uint8_t high,  bool pum
 void addDrainHistory(bool pump_on, int sensor_low, int sensor_high)
 	// extern'd in airco.cpp
 {
-	uint32_t dt = time(NULL);
-	if (sensor_low > MAX_LOW)
-	{
-		LOGE("SENSOR_LOW too high for chart(%d)",sensor_low);
-		sensor_low = 255;
-	}
-	if (sensor_high > MAX_HIGH)
-	{
-		LOGE("SENSOR_HIGH too high for chart(%d)",sensor_high);
-		sensor_high = 127;
-	}
+    uint32_t dt = time(NULL);
 
-	// constrain sensors to only going up when the pump is not on
-	// to save memory
+    if (sensor_low > MAX_LOW)
+    {
+        LOGE("SENSOR_LOW too high for chart(%d)", sensor_low);
+        sensor_low = 255;
+    }
+    if (sensor_high > MAX_HIGH)
+    {
+        LOGE("SENSOR_HIGH too high for chart(%d)", sensor_high);
+        sensor_high = 127;
+    }
 
-	uint8_t low = sensor_low / 10;
-	uint8_t high = sensor_high / 10;
-	if (!pump_on)
-	{
-		if (low < last_low)
-			low = last_low;
-		if (high < last_high)
-			high = last_high;
-	}
+	// constrain sensors to only going up when the pump is not on,
+	// or to compressed value moves downwards of RECORD_THRESHOLD,
+	// in order to save memory
 
-	if (pump_on != last_pump_on ||
-		low != last_low ||
-		high != last_high)
-	{
-		last_pump_on = pump_on;
-		last_low = low;
-		last_high = high;
-		addDrainHistoryRec(dt,low,high,pump_on);
-	}
+    uint8_t low  = sensor_low  / 10;
+    uint8_t high = sensor_high / 10;
+
+    if (!pump_on)
+    {
+        // LOW
+        if (low < last_low)
+        {
+            if ((last_low - low) < RECORD_THRESHOLD)
+            {
+                // too small a drop: suppress
+                low = last_low;
+            }
+        }
+
+        // HIGH
+        if (high < last_high)
+        {
+            if ((last_high - high) < RECORD_THRESHOLD)
+            {
+                high = last_high;
+            }
+        }
+    }
+
+    if (pump_on != last_pump_on ||
+        low     != last_low     ||
+        high    != last_high)
+    {
+        last_pump_on = pump_on;
+        last_low     = low;
+        last_high    = high;
+        addDrainHistoryRec(dt, low, high, pump_on);
+    }
 }
 
 
@@ -376,7 +403,7 @@ String drainPump::onCustomLink(const String &path,  const char **mime_type)
 	LOGD("drainPump::onCustomLink(%s)",path.c_str());
 
 	// CHART stuff
-	
+
 	if (path.startsWith("chart_header"))
 	{
 		*mime_type = "application/json";

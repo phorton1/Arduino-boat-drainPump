@@ -43,6 +43,7 @@
 #define DRAIN_MODE_FORCE		1
 #define DRAIN_MODE_HIGH			2	// turns on at high>HIGH_THRESH
 #define DRAIN_MODE_LOW			3	// turns on at low>LOW_THRESH
+#define DRAIN_MODE_BOTH			4	// turn on at either HIGH or LOW
 
 #define ERROR_NONE				0
 #define ERROR_TOO_LONG			1	// ran for MAX_TIME seconds waiting for low to go dry
@@ -54,7 +55,7 @@
 
 #define ID_UI_INTERVAL			"UI_INTERVAL"	// int milliseconds; default=1000; min=1000; max=30000 (5 minutes)
 	// How often do we update the webUI.
-	
+
 #define ID_CHK_INTERVAL			"CHK_INTERVAL"	// int milliseconds; Default=5000; min=100; max=30000 (30 seconds)
 	// How often do we sample the sensors into the circular buffers when the pump is off
 	// We sense once per second once the pump is on.
@@ -144,7 +145,7 @@ public:
 	void endRun(time_t time_now);
 	int readSensor(int pin, int *avg);
 	static void pumpOn(bool on);
-	
+
 	// public state variables to drainHistory.pm
 
 	static time_t m_run_start;
@@ -155,7 +156,7 @@ public:
 	#if WITH_PLOT
 		virtual bool hasPlot() override    { return true; }
 	#endif
-	
+
 };
 
 
@@ -166,8 +167,3 @@ public:
 extern enumValue errorCodes[];
 
 extern drainPump *drain_pump;
-
-
-
-
-
